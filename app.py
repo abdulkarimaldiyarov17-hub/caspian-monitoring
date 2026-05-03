@@ -1,5 +1,4 @@
 import streamlit as st
-import google.generativeai as genai
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -8,44 +7,64 @@ from openai import OpenAI
 import base64
 
 def get_base64(file_path):
-    with open(file_path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-img = get_base64("bg.jpg")
+    try:
+        with open(file_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        return None
 
 # --- 1. БЕТ ЖӘНЕ ЖИ БАПТАУ ---
 st.set_page_config(page_title="Caspian Navigation", layout="wide", page_icon="🌊")
 
+# API кілтін secrets.toml файлынан оқу
+# .streamlit/secrets.toml ішіне: GITHUB_TOKEN = "сіздің_кілтіңіз"
+client = None
+try:
+    api_key = st.secrets["GITHUB_TOKEN"]
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=api_key
+    )
+except Exception as e:
+    st.warning("⚠️ API кілті табылмады. ЖИ чат жұмыс жасамайды. .streamlit/secrets.toml файлын тексеріңіз.")
 
-# API кілтін Streamlit-тің жасырын баптауларынан (Secrets) алу
-if "GOOGLE_API_KEY" in st.secrets:
-    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=GOOGLE_API_KEY)
-else:
-    st.error("API кілті табылмады. Streamlit Cloud Settings бөлімін тексеріңіз.")
+img = get_base64("bg.jpg")
 
 # --- 2. ДИЗАЙН (CSS) ---
 
-st.markdown(f"""
-    <style>
-    [data-testid="stAppViewContainer"] {{
-        background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-                          url("data:image/jpg;base64,{img}");
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        background-repeat: no-repeat;
-    }}
-
-    [data-testid="stSidebar"] {{
-        background-color: rgba(0,0,0,0.7);
-    }}
-
-    h1, h2, h3, p, span, label, div {{
-        color: white !important;
-    }}
-    </style>
-""", unsafe_allow_html=True)
+if img:
+    st.markdown(f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+                              url("data:image/jpg;base64,{img}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }}
+        [data-testid="stSidebar"] {{
+            background-color: rgba(0,0,0,0.7);
+        }}
+        h1, h2, h3, p, span, label, div {{
+            color: white !important;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+        [data-testid="stAppViewContainer"] {
+            background: linear-gradient(135deg, #0a1628 0%, #0d2b4e 50%, #0a1628 100%);
+        }
+        [data-testid="stSidebar"] {
+            background-color: rgba(0,0,0,0.7);
+        }
+        h1, h2, h3, p, span, label, div {
+            color: white !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- 3. НАВИГАЦИЯ (SOL JYK MENU) ---
 with st.sidebar:
@@ -448,19 +467,23 @@ with st.expander("🤖 ЖИ Көмекшімен сөйлесу"):
         # 3. ЖИ жауабын қауіпсіз алу
         with st.chat_message("assistant"):
             with st.spinner("Жауап дайындалуда..."):
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": "Сен Каспий теңізі және Ақтау қаласы бойынша сарапшысың. Барлық жауаптарыңды тек қазақ тілінде бер. Ешқашан орыс немесе ағылшын тілінде жауап берме."},
-                            {"role": "user", "content": p}
-                        ]
-                    )
-                    answer = response.choices[0].message.content
-                    if answer:
-                        st.write(answer)
-                        st.session_state.msg.append({"role": "assistant", "content": answer})
-                    else:
-                        st.warning("ЖИ жауап беруден бас тартты немесе жауап бос.")
-                except Exception as e:
-                    st.error(f"Қате орын алды: {e}")
+                if client is None:
+                    st.error("ЖИ қосылмаған. .streamlit/secrets.toml ішіне GITHUB_TOKEN қосыңыз.")
+                    st.session_state.msg.append({"role": "assistant", "content": "API кілті табылмады."})
+                else:
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "system", "content": "Сен Каспий теңізі және Ақтау қаласы бойынша сарапшысың. Барлық жауаптарыңды тек қазақ тілінде бер. Ешқашан орыс немесе ағылшын тілінде жауап берме."},
+                                {"role": "user", "content": p}
+                            ]
+                        )
+                        answer = response.choices[0].message.content
+                        if answer:
+                            st.write(answer)
+                            st.session_state.msg.append({"role": "assistant", "content": answer})
+                        else:
+                            st.warning("ЖИ жауап беруден бас тартты немесе жауап бос.")
+                    except Exception as e:
+                        st.error(f"Қате орын алды: {e}")
