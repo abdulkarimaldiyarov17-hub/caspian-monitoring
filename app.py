@@ -1,4 +1,5 @@
 import streamlit as st
+import google.generativeai as genai
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -15,17 +16,13 @@ img = get_base64("bg.jpg")
 # --- 1. БЕТ ЖӘНЕ ЖИ БАПТАУ ---
 st.set_page_config(page_title="Caspian Navigation", layout="wide", page_icon="🌊")
 
-# API кілтін secrets.toml файлынан оқу
-# .streamlit/secrets.toml ішіне: GEMINI_API_KEY = "сіздің_кілтіңіз"
-try:
-    api_key = st.secrets["GITHUB_TOKEN"]
-    client = OpenAI(
-        base_url="https://models.inference.ai.azure.com",
-        api_key=api_key
-    )
-except Exception as e:
-    st.error("API кілті табылмады. .streamlit/secrets.toml файлын тексеріңіз.")
-    st.stop()
+
+# API кілтін Streamlit-тің жасырын баптауларынан (Secrets) алу
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    st.error("API кілті табылмады. Streamlit Cloud Settings бөлімін тексеріңіз.")
 
 # --- 2. ДИЗАЙН (CSS) ---
 
